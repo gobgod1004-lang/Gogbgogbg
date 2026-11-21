@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>헤드뱅잉 인어공주 3D</title>
 <style>
-html,body{margin:0;height:100%;background:#07030f;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;background:#07030f;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 #hud{pointer-events:none}
 #ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(7,3,15,.8);color:#ffe3f1;font-family:"Black Han Sans","Apple SD Gothic Neo","Malgun Gothic",sans-serif;text-align:center;padding:24px}
@@ -26,7 +26,7 @@ button:active{transform:translateY(4px);box-shadow:0 2px 0 #7a0b4a}
 <canvas id="hud"></canvas>
 <div id="ov">
   <h1 id="t">헤드뱅잉 인어공주 3D</h1>
-  <p id="m">링이 머리에 닿는 순간 스페이스바 또는 화면을 터치하세요.<br>콤보가 쌓일수록 헤드뱅잉과 무지개가 더 격렬해집니다.<br>소리가 납니다.</p>
+  <p id="m">공주 머리 주위로 손가락(마우스)을 둥글게 빙글빙글 드래그하면 머리가 돌아갑니다.<br>노래 박자가 칠 때 빠르게 돌고 있으면 콤보! 소리가 납니다.</p>
   <button id="b">시작</button>
 </div>
 <script>
@@ -40,7 +40,7 @@ document.body.prepend(R.domElement);
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x07030f,.05);
 const cam=new THREE.PerspectiveCamera(42,1,.1,100);
 let comp,bloom;
-if(THREE.EffectComposer&&THREE.UnrealBloomPass){comp=new THREE.EffectComposer(R);comp.addPass(new THREE.RenderPass(scene,cam));bloom=new THREE.UnrealBloomPass(new THREE.Vector2(512,512),1.2,.8,.15);comp.addPass(bloom)}
+if(THREE.EffectComposer&&THREE.UnrealBloomPass){comp=new THREE.EffectComposer(R);comp.addPass(new THREE.RenderPass(scene,cam));bloom=new THREE.UnrealBloomPass(new THREE.Vector2(512,512),.5,.5,.6);comp.addPass(bloom)}
 const hud=$('hud'),hx=hud.getContext('2d');let W,H,DPR;
 function rs(){W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,2);R.setSize(W,H);if(comp)comp.setSize(W,H);hud.width=W*DPR;hud.height=H*DPR;cam.aspect=W/H;cam.updateProjectionMatrix()}
 addEventListener('resize',rs);rs();
@@ -61,8 +61,8 @@ floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
 const arcs=[];for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.TorusGeometry(2.4+i*.2,.1,12,80,Math.PI),new THREE.MeshBasicMaterial({color:col(i/7),transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(0,.1,-2.2);scene.add(m);arcs.push(m)}
 const beams=[];for(let i=0;i<6;i++){const m=new THREE.Mesh(new THREE.CylinderGeometry(.05,.7,9,24,1,true),new THREE.MeshBasicMaterial({color:col(i/6),transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
   m.position.set((i-2.5)*1.5,5,-3);scene.add(m);beams.push(m)}
-scene.add(new THREE.AmbientLight(0x6a4a8a,.6));
-const key=new THREE.DirectionalLight(0xffffff,.9);key.position.set(2,5,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene.add(key);
+scene.add(new THREE.AmbientLight(0x8a6aa8,1));
+const key=new THREE.DirectionalLight(0xffffff,1.2);key.position.set(2,5,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene.add(key);
 const pls=[0,1,2].map(i=>{const l=new THREE.PointLight(0xffffff,2,12);scene.add(l);return l});
 
 /* ---------- 공주 ---------- */
@@ -108,7 +108,7 @@ const crownRing=null;
 /* ---------- 이펙트: 파티클 / 링 ---------- */
 const PN=3000,pp=new Float32Array(PN*3),pc=new Float32Array(PN*3),pb=new Float32Array(PN*3),pv=new Float32Array(PN*3),pl=new Float32Array(PN);let pi=0;
 const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pp,3));pg.setAttribute('color',new THREE.BufferAttribute(pc,3));
-const pts=new THREE.Points(pg,new THREE.PointsMaterial({size:.1,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));pts.frustumCulled=false;scene.add(pts);
+const pts=new THREE.Points(pg,new THREE.PointsMaterial({size:.07,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));pts.frustumCulled=false;scene.add(pts);
 function emit(n,p,sp){for(let k=0;k<n;k++){const i=pi++%PN,c=col(rnd()),a=rnd()*6.28,b=rnd()*3.1-1.2,s=sp*(.4+rnd());
   pp[i*3]=p.x;pp[i*3+1]=p.y;pp[i*3+2]=p.z;pv[i*3]=Math.cos(a)*Math.cos(b)*s;pv[i*3+1]=Math.sin(b)*s+1;pv[i*3+2]=Math.sin(a)*Math.cos(b)*s;
   pb[i*3]=c.r;pb[i*3+1]=c.g;pb[i*3+2]=c.b;pl[i]=1}}
@@ -120,84 +120,93 @@ let A,an,buf,src,tS=0,fq,dur=0;
 async function load(){if(buf)return;const r=await fetch(SONG);buf=await A.decodeAudioData(await r.arrayBuffer());dur=buf.duration}
 
 /* ---------- 게임 상태 ---------- */
-let notes=[],sc=0,combo=0,maxc=0,cnt={p:0,g:0,b:0,m:0},pops=[],run=false,lastBi=-99,hp=0,hv=0,kick=0,flash=0,en=0,enS=0;
+let sc=0,combo=0,maxc=0,cnt={p:0,g:0,m:0},pops=[],run=false,spin=0,om=0,drag=false,lastA=0,lastT=0,trail=[],kick=0,flash=0,en=0,enS=0,eAvg=0,lastOn=-9,scX=300,scY=300;
 async function start(){
   const b=$('b');b.textContent='불러오는 중…';b.disabled=true;
   try{A=A||new(window.AudioContext||window.webkitAudioContext)();await A.resume();await load()}catch(e){b.textContent='음악 로드 실패 (song.mp3 확인)';b.disabled=false;return}
-  an=A.createAnalyser();an.fftSize=256;fq=new Uint8Array(an.frequencyBinCount);
+  an=A.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=.3;fq=new Uint8Array(an.frequencyBinCount);
   src=A.createBufferSource();src.buffer=buf;src.connect(an);an.connect(A.destination);tS=A.currentTime+1;src.start(tS);
-  notes=[];for(let n=0;n<NN;n++)notes.push({t:FIRST+n*PER,h:false,x:false});
-  sc=0;combo=0;maxc=0;cnt={p:0,g:0,b:0,m:0};pops=[];lastBi=-99;run=true;b.disabled=false;$('ov').style.display='none'}
+  sc=0;combo=0;maxc=0;cnt={p:0,g:0,m:0};pops=[];om=0;run=true;b.disabled=false;$('ov').style.display='none'}
 const sT=()=>A.currentTime-tS;
 function pop(s,c){pops.push({s,c,a:1,y:0})}
-function tap(){
-  if(!run)return;const tm=sT();let best=null,bd=9;
-  for(const n of notes){if(n.h||n.x)continue;const d=Math.abs(n.t-tm);if(d<bd){bd=d;best=n}}
-  if(!best||bd>.24){combo=0;cnt.m++;pop('엇박','#9aa');kick=-.6;return}
-  best.h=true;let pt,s,c;
-  if(bd<.07){pt=100;s='PERFECT';c='#ffe14a';cnt.p++}else if(bd<.14){pt=60;s='GOOD';c='#5ff0ff';cnt.g++}else{pt=25;s='BAD';c='#c9a0ff';cnt.b++}
-  combo++;maxc=Math.max(maxc,combo);sc+=Math.round(pt*(1+Math.min(combo,50)/25));pop(s,c);kick=1;flash=1;
-  const p=new THREE.Vector3();hd.getWorldPosition(p);emit(bd<.07?160:80,p,bd<.07?5:3.5);ring(p,rnd(),12);if(bd<.07)ring(p,rnd(),8)}
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();if(!e.repeat)tap()}});
-hud.parentElement.addEventListener('pointerdown',e=>{if(e.target.closest('#ov'))return;tap()});
+const wrap=d=>d>Math.PI?d-6.2832:d<-Math.PI?d+6.2832:d;
+addEventListener('pointerdown',e=>{if(e.target.closest('#ov'))return;drag=true;lastA=Math.atan2(e.clientY-scY,e.clientX-scX);lastT=performance.now();trail=[]});
+addEventListener('pointermove',e=>{if(!drag)return;const a=Math.atan2(e.clientY-scY,e.clientX-scX),n=performance.now(),d=wrap(a-lastA),dt=Math.max(.008,(n-lastT)/1000);
+  om+=(Math.max(-40,Math.min(40,d/dt))-om)*.3;if(run||true)spin+=d;lastA=a;lastT=n;trail.push({x:e.clientX,y:e.clientY,t:n});if(trail.length>40)trail.shift()});
+addEventListener('pointerup',()=>drag=false);addEventListener('pointercancel',()=>drag=false);
 $('b').onclick=start;
 
 /* ---------- 메인 루프 ---------- */
-const clock=new THREE.Clock(),hw=new THREE.Vector3(),v3=new THREE.Vector3();let hsp=0,hsv=0;
+const clock=new THREE.Clock(),hw=new THREE.Vector3(),v3=new THREE.Vector3();
+let hpx=0,hvx=0,hpz=0,hvz=0,hsx=0,hsvx=0,hsz=0,hsvz=0;
 function loop(){
   requestAnimationFrame(loop);
-  const dt=Math.min(.05,clock.getDelta()),T=clock.elapsedTime;
-  const tm=run?sT():T-1,bi=Math.floor((tm-FIRST)/PER),ph=(((tm-FIRST)/PER)%1+1)%1;
-  if(an){an.getByteFrequencyData(fq);let s=0;for(let i=0;i<8;i++)s+=fq[i];en=s/8/255}else en=.3+.2*Math.sin(T*4);
-  enS+=(en-enS)*Math.min(1,dt*12);
-  const I=.85+.5*Math.min(combo/30,1)+enS*.3,slam=Math.exp(-ph*4.2);
-  /* 헤드뱅잉: 비트마다 쾅 찍고 뒤로 젖힘 */
-  kick*=Math.pow(.02,dt);
-  const target=I*(1.45*slam-.55)+kick*.35;
-  hv+=((target-hp)*900-hv*32)*dt;hp+=hv*dt;
-  hsv+=((hp-hsp)*70-hsv*4.5)*dt;hsp+=hsv*dt; // 머리카락은 늦게 따라옴 (채찍 효과)
-  neck.rotation.x=hp;neck.rotation.z=Math.sin(bi*Math.PI+ph*Math.PI)*.4*I;neck.rotation.y=Math.sin(T*2.2)*.35*I;
-  pr.rotation.y=Math.sin(T*1.1)*.5;pr.rotation.x=hp*.12;pr.position.y=slam*.06*I;
-  tailG.rotation.z=Math.sin(T*3.2+bi)*.25*I;tailG.rotation.x=-hp*.15;
-  arms[0].rotation.z=.2+Math.sin(T*4)*.1;arms[1].rotation.z=-2.7+Math.sin(T*8)*.25*I;arms[1].rotation.x=slam*.4;
-  ears.forEach((e,i)=>e.rotation.z=(i?-1:1)*(.15+hsv*.12+hp*.2));tg.position.y=-.17-Math.max(0,hp)*.05;
-  const lag=hp-hsp;
-  for(const s of strands)s.js.forEach((j,k)=>{j.rotation.x=.04-lag*.5+Math.sin(T*3+s.ph+k*.5)*.03;j.rotation.z=Math.sin(T*2+s.ph)*.03+neck.rotation.z*-.04});
-  tipMats.forEach((m,i)=>m.color.copy(col(T*.6+i*.12)));
-  /* 비트 이펙트 */
+  const dt=Math.min(.05,clock.getDelta()),T=clock.elapsedTime,tm=run?sT():0,now=A?A.currentTime:T;
+  if(an){an.getByteFrequencyData(fq);let s=0;for(let i=0;i<4;i++)s+=fq[i];en=s/4/255}else en=.25;
+  eAvg+=(en-eAvg)*Math.min(1,dt*3);enS+=(en-enS)*Math.min(1,dt*10);
+  /* 노래의 저음(킥/베이스)을 실시간으로 감지해서 박자로 사용 */
+  if(!run)om=8+Math.sin(T)*2;
+  else{om*=Math.pow(drag?.08:.35,dt);if(!drag)spin+=om*dt}
+  if(!run)spin+=om*dt;
+  const amp=Math.min(1,Math.abs(om)/10);
+  if(now-lastOn>.28&&((run&&en>eAvg*1.18+.03&&en>.3)||now-lastOn>(run?.75:.5))){
+    lastOn=now;kick=1;
+    if(run&&tm>0){const w=Math.abs(om),mu=1+Math.min(combo,50)/25;
+      if(w>=9){combo++;cnt.p++;sc+=100*mu;pop('PERFECT','#ffe14a');flash=1}
+      else if(w>=4){combo++;cnt.g++;sc+=50*mu;pop('GOOD','#5ff0ff');flash=.6}
+      else{if(combo)pop('MISS','#f66');combo=0;cnt.m++}
+      maxc=Math.max(maxc,combo)}
+    hd.getWorldPosition(hw);ring(hw,T*.3,6);emit(20+Math.floor(amp*40),hw,2.5)}
+  if(run&&tm>0)sc+=Math.abs(om)*dt*10*(1+Math.min(combo,50)/25);
+  kick*=Math.pow(.01,dt);flash=Math.max(0,flash-dt*3);
+  /* 머리 회전: 손가락 각도 = 머리 끝이 그리는 원 */
+  const A0=1.15*amp,tx=A0*Math.cos(spin)+kick*.55-.05,tz=A0*Math.sin(spin);
+  hvx+=((tx-hpx)*500-hvx*26)*dt;hpx+=hvx*dt;hvz+=((tz-hpz)*500-hvz*26)*dt;hpz+=hvz*dt;
+  hsvx+=((hpx-hsx)*45-hsvx*3.5)*dt;hsx+=hsvx*dt;hsvz+=((hpz-hsz)*45-hsvz*3.5)*dt;hsz+=hsvz*dt; // 머리카락은 한 박자 늦게 채찍처럼
+  neck.rotation.set(hpx,Math.sin(spin+1)*.7*amp,hpz);
+  pr.rotation.y=Math.sin(T*.8)*.25;pr.position.y=kick*.05;
+  tailG.rotation.z=Math.sin(T*3)*.12+Math.sin(spin)*.3*amp;tailG.rotation.x=-hpx*.15;
+  arms[0].rotation.z=.2+Math.sin(T*4)*.1;arms[1].rotation.z=-2.7+Math.sin(T*8)*.25*amp;arms[1].rotation.x=kick*.4;
+  ears.forEach((e,i)=>e.rotation.z=(i?-1:1)*(.15+hsvz*.06+Math.abs(hpz)*.3));tg.position.y=-.17-Math.max(0,hpx)*.05;
+  const lx=hpx-hsx,lz=hpz-hsz;
+  for(const s of strands)s.js.forEach((j,k)=>{j.rotation.x=.04-lx*.55+Math.sin(T*3+s.ph+k*.5)*.03;j.rotation.z=-lz*.55+Math.sin(T*2+s.ph)*.03});
+  tipMats.forEach((m,i)=>m.color.copy(col(T*.6+i*.12)).multiplyScalar(.8));
+  /* 이펙트 (밝기 낮춤) */
   hd.getWorldPosition(hw);
-  if(bi!==lastBi){lastBi=bi;ring(hw,T*.3,7);emit(30+Math.floor(enS*80),hw,3)}
-  for(let i=rg.length-1;i>=0;i--){const m=rg[i];m.scale.addScalar(dt*m.userData.sp);m.material.opacity=Math.max(0,1-(m.scale.x-1)/8);m.material.color.copy(col(T*.5+i*.07));if(m.material.opacity<=0){scene.remove(m);m.material.dispose();rg.splice(i,1)}}
-  for(let i=0;i<PN;i++)if(pl[i]>0){pl[i]-=dt*.55;pv[i*3+1]-=3*dt;for(let k=0;k<3;k++){pp[i*3+k]+=pv[i*3+k]*dt;pc[i*3+k]=pb[i*3+k]*Math.max(0,pl[i])}}else{pc[i*3]=pc[i*3+1]=pc[i*3+2]=0}
+  if(amp>.25)emit(Math.floor(amp*5),hw,2);
+  for(let i=rg.length-1;i>=0;i--){const m=rg[i];m.scale.addScalar(dt*m.userData.sp);m.material.opacity=Math.max(0,.7*(1-(m.scale.x-1)/8));m.material.color.copy(col(T*.5+i*.07));if(m.material.opacity<=0){scene.remove(m);m.material.dispose();rg.splice(i,1)}}
+  for(let i=0;i<PN;i++)if(pl[i]>0){pl[i]-=dt*.6;pv[i*3+1]-=3*dt;for(let k=0;k<3;k++){pp[i*3+k]+=pv[i*3+k]*dt;pc[i*3+k]=pb[i*3+k]*Math.max(0,pl[i])*.7}}else{pc[i*3]=pc[i*3+1]=pc[i*3+2]=0}
   pg.attributes.position.needsUpdate=pg.attributes.color.needsUpdate=true;
-  arcs.forEach((a,i)=>{a.material.color.copy(col(i/7+T*.25));a.material.opacity=.55+.4*enS+slam*.2;a.scale.setScalar(1+slam*.05*(1+i*.1))});
-  beams.forEach((b,i)=>{b.material.color.copy(col(i/6+T*.4));b.material.opacity=.1+.2*enS+flash*.1;b.rotation.z=Math.sin(T*1.3+i*1.1)*.7;b.rotation.x=Math.cos(T*.9+i)*.3});
-  sky.rotation.y=T*.08;sky.material.color.setScalar(.12+enS*.6+flash*.2);floorTex.rotation=T*.6;floor.material.emissiveIntensity=.35+enS*1.4+slam*.5;
-  pls.forEach((l,i)=>{l.color.copy(col(T*.5+i/3));l.intensity=1.5+slam*3+enS*3;l.position.set(Math.sin(T*1.4+i*2.1)*3,1+i*.8,Math.cos(T*1.4+i*2.1)*2.5+1)});
-  flash=Math.max(0,flash-dt*3);
-  if(bloom)bloom.strength=.9+enS*1.6+slam*.7+flash*.6;
-  /* 카메라: 궤도 + 쿵 흔들림 */
-  const cz=cam.aspect<1?6.4:4.6,sh=(slam*.05+flash*.04)*I;
-  cam.position.set(Math.sin(T*.35)*1.2+(rnd()-.5)*sh,1.4+Math.sin(T*.5)*.25+(rnd()-.5)*sh,cz+Math.cos(T*.35)*.3);cam.fov=42-slam*3*I;cam.updateProjectionMatrix();cam.lookAt(0,1.2,0);
+  arcs.forEach((a,i)=>{a.material.color.copy(col(i/7+T*.2));a.material.opacity=.25+.25*enS+kick*.1});
+  beams.forEach((b,i)=>{b.material.color.copy(col(i/6+T*.3));b.material.opacity=.04+.08*enS+flash*.03;b.rotation.z=Math.sin(T*1.1+i*1.1)*.7;b.rotation.x=Math.cos(T*.8+i)*.3});
+  sky.rotation.y=T*.06;sky.material.color.setScalar(.04+enS*.14+flash*.04);floorTex.rotation=T*.4;floor.material.emissiveIntensity=.1+enS*.35+kick*.1;
+  pls.forEach((l,i)=>{l.color.copy(col(T*.4+i/3));l.intensity=.8+kick*1.2+enS*1.5;l.position.set(Math.sin(T*1.2+i*2.1)*3,1+i*.8,Math.cos(T*1.2+i*2.1)*2.5+1)});
+  if(bloom)bloom.strength=.3+enS*.5+kick*.2+flash*.2;
+  const cz=cam.aspect<1?6.4:4.6;
+  cam.position.set(Math.sin(T*.3)*.8,1.4+Math.sin(T*.45)*.2,cz+Math.cos(T*.3)*.3);cam.fov=42;cam.updateProjectionMatrix();cam.lookAt(0,1.2,0);
   if(comp)comp.render();else R.render(scene,cam);
-  if(run){for(const n of notes)if(!n.h&&!n.x&&tm-n.t>.24){n.x=true;combo=0;cnt.m++;pop('MISS','#f66')}
-    if(tm>notes[NN-1].t+1.5||tm>dur+.3)finish()}
+  if(run&&(tm>dur+.3))finish();
   drawHud(tm)}
 function drawHud(tm){
   hx.setTransform(DPR,0,0,DPR,0,0);hx.clearRect(0,0,W,H);
-  v3.copy(hw).project(cam);const cx=(v3.x*.5+.5)*W,cy=(-v3.y*.5+.5)*H,r0=Math.min(W,H)*.13,u=Math.min(W,H)/600;
-  hx.lineWidth=2;hx.setLineDash([6,6]);hx.strokeStyle='rgba(255,255,255,.6)';hx.beginPath();hx.arc(cx,cy,r0,0,7);hx.stroke();hx.setLineDash([]);
-  if(run)for(const n of notes){const d=n.t-tm;if(n.h||n.x||d>1.3||d<-.25)continue;const rr=r0+Math.max(0,d)*420*u,a=Math.min(1,(1.3-d)*1.6);
-    hx.lineWidth=6*u+2;hx.strokeStyle=Math.abs(d)<.07?`rgba(255,225,74,${a})`:`hsla(${(n.t*90)%360},100%,65%,${a})`;hx.shadowColor='#ff2d95';hx.shadowBlur=14;hx.beginPath();hx.arc(cx,cy,rr,0,7);hx.stroke();hx.shadowBlur=0}
-  hx.textAlign='center';hx.fillStyle='#fff';hx.shadowColor='#000';hx.shadowBlur=6;hx.font=`800 ${Math.max(22,u*34)}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(String(sc).padStart(6,'0'),W/2,Math.max(40,u*50));
-  if(combo>1){hx.fillStyle=`hsl(${(performance.now()/4)%360},100%,65%)`;hx.font=`800 ${Math.max(18,u*28)*(1+flash*.2)}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(combo+' 콤보',W/2,Math.max(72,u*88))}
-  for(let i=pops.length-1;i>=0;i--){const p=pops[i];p.a-=.03;p.y+=1.5;if(p.a<=0){pops.splice(i,1);continue}hx.globalAlpha=p.a;hx.fillStyle=p.c;hx.font=`800 ${u*38}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(p.s,cx,cy+r0+u*44-p.y);hx.globalAlpha=1}
+  v3.copy(hw).project(cam);const cx=(v3.x*.5+.5)*W,cy=(-v3.y*.5+.5)*H,u=Math.min(W,H)/600;scX=cx;scY=cy;
+  const n=performance.now();
+  /* 드래그 궤적: 무지개 */
+  while(trail.length&&n-trail[0].t>500)trail.shift();
+  hx.lineCap='round';
+  for(let i=1;i<trail.length;i++){const a=trail[i-1],b=trail[i],f=1-(n-b.t)/500;hx.strokeStyle=`hsla(${(b.t/3)%360},100%,60%,${f*.8})`;hx.lineWidth=10*u*f+2;hx.beginPath();hx.moveTo(a.x,a.y);hx.lineTo(b.x,b.y);hx.stroke()}
+  hx.textAlign='center';hx.shadowColor='#000';hx.shadowBlur=6;
+  if(run&&!drag&&Math.abs(om)<2){hx.setLineDash([6,8]);hx.strokeStyle='rgba(255,255,255,.55)';hx.lineWidth=2;hx.beginPath();hx.arc(cx,cy,Math.min(W,H)*.2,0,7);hx.stroke();hx.setLineDash([]);hx.fillStyle='#fff';hx.font=`700 ${Math.max(14,u*20)}px "Apple SD Gothic Neo",sans-serif`;hx.fillText('머리 주위를 둥글게 드래그!',cx,cy+Math.min(W,H)*.2+u*30)}
+  hx.fillStyle='#fff';hx.font=`800 ${Math.max(22,u*34)}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(String(Math.floor(sc)).padStart(6,'0'),W/2,Math.max(40,u*50));
+  if(combo>1){hx.fillStyle=`hsl(${(n/4)%360},100%,65%)`;hx.font=`800 ${Math.max(18,u*28)*(1+flash*.2)}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(combo+' 콤보',W/2,Math.max(72,u*88))}
+  if(run&&dur){hx.shadowBlur=0;hx.fillStyle='rgba(255,255,255,.15)';hx.fillRect(0,0,W,4);hx.fillStyle='#ff5fae';hx.fillRect(0,0,W*Math.max(0,Math.min(1,tm/dur)),4)}
+  for(let i=pops.length-1;i>=0;i--){const p=pops[i];p.a-=.03;p.y+=1.5;if(p.a<=0){pops.splice(i,1);continue}hx.globalAlpha=p.a;hx.fillStyle=p.c;hx.shadowBlur=6;hx.font=`800 ${u*38}px "Apple SD Gothic Neo",sans-serif`;hx.fillText(p.s,cx,cy-Math.min(W,H)*.2-p.y);hx.globalAlpha=1}
   hx.shadowBlur=0}
 function finish(){
   run=false;try{src.stop()}catch(e){}
-  const tot=cnt.p+cnt.g+cnt.b+cnt.m,q=(cnt.p+cnt.g*.6+cnt.b*.3)/tot,rank=q>.9?'S':q>.75?'A':q>.55?'B':'C';
+  const tot=cnt.p+cnt.g+cnt.m,q=tot?(cnt.p+cnt.g*.5)/tot:0,rank=q>.8?'S':q>.6?'A':q>.4?'B':'C';
   $('t').textContent='랭크 '+rank;
-  $('m').innerHTML=`점수 <b>${sc}</b> · 최대 콤보 <b>${maxc}</b><br>PERFECT ${cnt.p} / GOOD ${cnt.g} / BAD ${cnt.b} / MISS ${cnt.m}`;
+  $('m').innerHTML=`점수 <b>${Math.floor(sc)}</b> · 최대 콤보 <b>${maxc}</b><br>PERFECT ${cnt.p} / GOOD ${cnt.g} / MISS ${cnt.m}`;
   $('b').textContent='다시 하기';$('ov').style.display='flex'}
 loop();
 </script>
