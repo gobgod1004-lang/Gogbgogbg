@@ -26,7 +26,7 @@ button:active{transform:translateY(4px);box-shadow:0 2px 0 #7a0b4a}
 <canvas id="hud"></canvas>
 <div id="ov">
   <h1 id="t">헤드뱅잉 인어공주 3D</h1>
-  <p id="m">공주 머리 주위로 손가락(마우스)을 둥글게 빙글빙글 드래그하면 머리가 돌아갑니다.<br>노래 박자가 칠 때 빠르게 돌고 있으면 콤보! 소리가 납니다.</p>
+  <p id="m">공주 머리 주위로 손가락(마우스)을 둥글게 빙글빙글 드래그하면 머리가 돌아갑니다.<br>드래그하는 방향에 따라 인어공주가 온몸으로 춤을 춰요!<br>노래 박자가 칠 때 빠르게 돌고 있으면 콤보! 소리가 납니다.</p>
   <button id="b">시작</button>
 </div>
 <script>
@@ -92,18 +92,62 @@ const earMat=M({map:furTex,color:0x8a5526,roughness:.9});
 const ears=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.23,.1,0);hd.add(g);const e=mesh(SP(.08),earMat,[s*.04,-.14,0],g);e.scale.set(.55,1.9,1);return g});
 const gold=M({color:0xffc83a,metalness:1,roughness:.2,emissive:0x553300,emissiveIntensity:.4});
 for(let i=0;i<5;i++){const a=i/5*6.283,c=mesh(new THREE.ConeGeometry(.04,.14,8),gold,[Math.sin(a)*.12,.31,Math.cos(a)*.12-.03],hd)}
-/* 분홍 머리카락: 관절 체인 */
-const hairMat=M({color:0xff4fa3,roughness:.35,clearcoat:.8,emissive:0x6a0a3a,emissiveIntensity:.4});
-const tipMats=[0,1,2].map(()=>new THREE.MeshBasicMaterial({color:0xffffff}));
-const strands=[],SEG=10,LEN=.075;
-for(let i=0;i<46;i++){const th=Math.PI*(.3+1.4*i/45)+(rnd()-.5)*.1,e=.1+rnd()*1;
-  const root=new THREE.Group();root.position.set(.27*Math.cos(e)*Math.sin(th),.27*Math.sin(e)*1.05,.27*Math.cos(e)*Math.cos(th));root.rotation.set(-Math.cos(th)*.4,0,Math.sin(th)*.4);hd.add(root);
-  let par=root;const js=[];
-  for(let k=0;k<SEG;k++){const j=new THREE.Group();if(k)j.position.y=-LEN;par.add(j);
-    const r=.022-.012*k/SEG,g=new THREE.CylinderGeometry(r,r*.92,LEN*1.1,6);g.translate(0,-LEN/2,0);
-    const m=new THREE.Mesh(g,k>=SEG-3?tipMats[k-(SEG-3)]:hairMat);j.add(m);js.push(j);par=j}
-  strands.push({js,ph:rnd()*6})}
-const crownRing=null;
+
+/* ---------- 긴 분홍 머리카락: 물리(베를레) 체인 + 리본 메시 ---------- */
+const NS=96,SEG=22,SL=.082; // 가닥 수, 마디 수, 마디 길이 (총 길이 약 1.7)
+const strands=[];
+for(let i=0;i<NS;i++){
+  const th=Math.PI*(.28+1.44*(i/(NS-1)))+(rnd()-.5)*.14,e=.05+rnd()*1.35;
+  const n=new THREE.Vector3(Math.cos(e)*Math.sin(th),Math.sin(e),Math.cos(e)*Math.cos(th));
+  strands.push({rl:n.clone().multiply(new THREE.Vector3(.27,.284,.27)),dl:n.clone().add(new THREE.Vector3(0,-.9,0)).normalize(),
+    P:new Float32Array(SEG*3),Q:new Float32Array(SEG*3),sl:SL*(.82+rnd()*.22),ph:rnd()*6,hue:rnd()*.1,w:.85+rnd()*.5,init:false});
+}
+const hpos=new Float32Array(NS*SEG*6),hcol=new Float32Array(NS*SEG*6),hidx=[];
+for(let s=0;s<NS;s++)for(let k=0;k<SEG-1;k++){const a=(s*SEG+k)*2;hidx.push(a,a+1,a+2,a+1,a+3,a+2)}
+const hg=new THREE.BufferGeometry();hg.setAttribute('position',new THREE.BufferAttribute(hpos,3));hg.setAttribute('color',new THREE.BufferAttribute(hcol,3));hg.setIndex(hidx);
+const hairMesh=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));hairMesh.frustumCulled=false;scene.add(hairMesh);
+/* 머리카락이 몸/머리를 뚫지 않게 하는 충돌 구 */
+const colls=[],cl=(par,y,r)=>{const o=new THREE.Object3D();o.position.y=y;par.add(o);colls.push({o,p:new THREE.Vector3(),r,k:2})};
+cl(pr,1.45,.2);cl(pr,1.3,.23);cl(pr,1.15,.27);cl(tailG,-.15,.26);cl(tailG,-.35,.23);cl(tailG,-.55,.2);
+colls.push({o:hd,p:new THREE.Vector3(),r:.29,k:3});
+const tA=new THREE.Vector3(),tD=new THREE.Vector3(),tC=new THREE.Color();
+function stepHair(dt,T){
+  pr.updateMatrixWorld(true);
+  for(const c of colls)c.o.getWorldPosition(c.p);
+  const n=2,h=Math.min(dt,.033)/n,g=-9*h*h,dm=Math.pow(.22,h),fl=2.2*h*h;
+  for(const s of strands){
+    const P=s.P,Q=s.Q,sl=s.sl;
+    tA.copy(s.rl).applyMatrix4(hd.matrixWorld);tD.copy(s.dl).transformDirection(hd.matrixWorld);
+    if(!s.init){s.init=true;for(let k=0;k<SEG;k++){const i=k*3,f=Math.min(k,1),d=Math.max(0,k-1);
+      P[i]=Q[i]=tA.x+tD.x*sl*f;P[i+1]=Q[i+1]=tA.y+tD.y*sl*f-sl*d;P[i+2]=Q[i+2]=tA.z+tD.z*sl*f}}
+    for(let it=0;it<n;it++){
+      P[0]=tA.x;P[1]=tA.y;P[2]=tA.z;P[3]=tA.x+tD.x*sl;P[4]=tA.y+tD.y*sl;P[5]=tA.z+tD.z*sl;
+      for(let k=2;k<SEG;k++){const i=k*3;
+        for(let c=0;c<3;c++){const v=(P[i+c]-Q[i+c])*dm;Q[i+c]=P[i+c];P[i+c]+=v}
+        P[i+1]+=g;P[i]+=Math.sin(T*3.1+s.ph+k*.6)*fl;P[i+2]+=Math.cos(T*2.3+s.ph*1.3+k*.5)*fl}
+      for(let r=0;r<4;r++)for(let k=2;k<SEG;k++){const i=k*3,j=i-3;
+        let dx=P[i]-P[j],dy=P[i+1]-P[j+1],dz=P[i+2]-P[j+2];const d=Math.hypot(dx,dy,dz)||1e-6,f=(d-sl)/d,w=k<=2?1:.5;
+        P[i]-=dx*f*w;P[i+1]-=dy*f*w;P[i+2]-=dz*f*w;if(k>2){P[j]+=dx*f*.5;P[j+1]+=dy*f*.5;P[j+2]+=dz*f*.5}
+        if(r===0&&k>2){const st=.02+.14*(1-k/SEG),b=j-3;
+          P[i]+=(2*P[j]-P[b]-P[i])*st;P[i+1]+=(2*P[j+1]-P[b+1]-P[i+1])*st;P[i+2]+=(2*P[j+2]-P[b+2]-P[i+2])*st}}
+      for(const c of colls){const r2=c.r*c.r;for(let k=c.k;k<SEG;k++){const i=k*3,dx=P[i]-c.p.x,dy=P[i+1]-c.p.y,dz=P[i+2]-c.p.z,d2=dx*dx+dy*dy+dz*dz;
+        if(d2<r2&&d2>1e-8){const f=c.r/Math.sqrt(d2);P[i]=c.p.x+dx*f;P[i+1]=c.p.y+dy*f;P[i+2]=c.p.z+dz*f}}}
+      for(let k=2;k<SEG;k++)if(P[k*3+1]<.03)P[k*3+1]=.03;
+    }
+  }
+  /* 카메라를 향하는 리본으로 변환 + 색(핑크 → 끝은 무지개) */
+  let o=0;
+  for(const s of strands){const P=s.P;
+    for(let k=0;k<SEG;k++){const i=k*3,a=Math.max(k-1,0)*3,b=Math.min(k+1,SEG-1)*3,u=k/(SEG-1);
+      const tx=P[b]-P[a],ty=P[b+1]-P[a+1],tz=P[b+2]-P[a+2],vx=cam.position.x-P[i],vy=cam.position.y-P[i+1],vz=cam.position.z-P[i+2];
+      let sx=ty*vz-tz*vy,sy=tz*vx-tx*vz,sz=tx*vy-ty*vx;const l=Math.hypot(sx,sy,sz)||1,w=(.034*(1-.75*u)+.004)*s.w/l;sx*=w;sy*=w;sz*=w;
+      hpos[o]=P[i]-sx;hpos[o+1]=P[i+1]-sy;hpos[o+2]=P[i+2]-sz;hpos[o+3]=P[i]+sx;hpos[o+4]=P[i+1]+sy;hpos[o+5]=P[i+2]+sz;
+      const sh=(.5+.5*Math.min(1,u*4))*(.8+.3*Math.sin(u*9-T*2.5+s.ph))*.95,m=Math.max(0,(u-.5)*2);
+      tC.setHSL((T*.5+u*.6+s.hue)%1,1,.6);
+      const r=(1+(tC.r-1)*m)*sh,gg=(.3+(tC.g-.3)*m)*sh,bb=(.65+(tC.b-.65)*m)*sh;
+      hcol[o]=hcol[o+3]=r;hcol[o+1]=hcol[o+4]=gg;hcol[o+2]=hcol[o+5]=bb;o+=6}}
+  hg.attributes.position.needsUpdate=hg.attributes.color.needsUpdate=true;
+}
 
 /* ---------- 이펙트: 파티클 / 링 ---------- */
 const PN=3000,pp=new Float32Array(PN*3),pc=new Float32Array(PN*3),pb=new Float32Array(PN*3),pv=new Float32Array(PN*3),pl=new Float32Array(PN);let pi=0;
@@ -121,6 +165,7 @@ async function load(){if(buf)return;const r=await fetch(SONG);buf=await A.decode
 
 /* ---------- 게임 상태 ---------- */
 let sc=0,combo=0,maxc=0,cnt={p:0,g:0,m:0},pops=[],run=false,spin=0,om=0,drag=false,lastA=0,lastT=0,trail=[],kick=0,flash=0,en=0,enS=0,eAvg=0,lastOn=-9,scX=300,scY=300;
+let tdx=0,tdy=0,dxs=0,dys=0; // 드래그 위치(화면 중심 기준) → 춤 동작
 async function start(){
   const b=$('b');b.textContent='불러오는 중…';b.disabled=true;
   try{A=A||new(window.AudioContext||window.webkitAudioContext)();await A.resume();await load()}catch(e){b.textContent='음악 로드 실패 (song.mp3 확인)';b.disabled=false;return}
@@ -130,10 +175,12 @@ async function start(){
 const sT=()=>A.currentTime-tS;
 function pop(s,c){pops.push({s,c,a:1,y:0})}
 const wrap=d=>d>Math.PI?d-6.2832:d<-Math.PI?d+6.2832:d;
-addEventListener('pointerdown',e=>{if(e.target.closest('#ov'))return;drag=true;lastA=Math.atan2(e.clientY-scY,e.clientX-scX);lastT=performance.now();trail=[]});
-addEventListener('pointermove',e=>{if(!drag)return;const a=Math.atan2(e.clientY-scY,e.clientX-scX),n=performance.now(),d=wrap(a-lastA),dt=Math.max(.008,(n-lastT)/1000);
-  om+=(Math.max(-40,Math.min(40,d/dt))-om)*.3;if(run||true)spin+=d;lastA=a;lastT=n;trail.push({x:e.clientX,y:e.clientY,t:n});if(trail.length>40)trail.shift()});
-addEventListener('pointerup',()=>drag=false);addEventListener('pointercancel',()=>drag=false);
+const setD=e=>{tdx=(e.clientX/W-.5)*2.4;tdy=(e.clientY/H-.5)*2};
+addEventListener('pointerdown',e=>{if(e.target.closest('#ov'))return;drag=true;lastA=Math.atan2(e.clientY-scY,e.clientX-scX);lastT=performance.now();trail=[];setD(e)});
+addEventListener('pointermove',e=>{if(!drag)return;setD(e);const a=Math.atan2(e.clientY-scY,e.clientX-scX),n=performance.now(),d=wrap(a-lastA),dt=Math.max(.008,(n-lastT)/1000);
+  om+=(Math.max(-40,Math.min(40,d/dt))-om)*.3;spin+=d;lastA=a;lastT=n;trail.push({x:e.clientX,y:e.clientY,t:n});if(trail.length>40)trail.shift()});
+const up=()=>{drag=false;tdx=tdy=0};
+addEventListener('pointerup',up);addEventListener('pointercancel',up);
 $('b').onclick=start;
 
 /* ---------- 메인 루프 ---------- */
@@ -144,7 +191,6 @@ function loop(){
   const dt=Math.min(.05,clock.getDelta()),T=clock.elapsedTime,tm=run?sT():0,now=A?A.currentTime:T;
   if(an){an.getByteFrequencyData(fq);let s=0;for(let i=0;i<4;i++)s+=fq[i];en=s/4/255}else en=.25;
   eAvg+=(en-eAvg)*Math.min(1,dt*3);enS+=(en-enS)*Math.min(1,dt*10);
-  /* 노래의 저음(킥/베이스)을 실시간으로 감지해서 박자로 사용 */
   if(!run)om=8+Math.sin(T)*2;
   else{om*=Math.pow(drag?.08:.35,dt);if(!drag)spin+=om*dt}
   if(!run)spin+=om*dt;
@@ -159,19 +205,22 @@ function loop(){
     hd.getWorldPosition(hw);ring(hw,T*.3,6);emit(20+Math.floor(amp*40),hw,2.5)}
   if(run&&tm>0)sc+=Math.abs(om)*dt*10*(1+Math.min(combo,50)/25);
   kick*=Math.pow(.01,dt);flash=Math.max(0,flash-dt*3);
-  /* 머리 회전: 손가락 각도 = 머리 끝이 그리는 원 */
-  const A0=1.15*amp,tx=A0*Math.cos(spin)+kick*.55-.05,tz=A0*Math.sin(spin);
+  /* 머리 회전 (진폭 키움) */
+  const A0=1.3*amp,tx=A0*Math.cos(spin)+kick*.6-.05,tz=A0*Math.sin(spin);
   hvx+=((tx-hpx)*500-hvx*26)*dt;hpx+=hvx*dt;hvz+=((tz-hpz)*500-hvz*26)*dt;hpz+=hvz*dt;
-  hsvx+=((hpx-hsx)*45-hsvx*3.5)*dt;hsx+=hsvx*dt;hsvz+=((hpz-hsz)*45-hsvz*3.5)*dt;hsz+=hsvz*dt; // 머리카락은 한 박자 늦게 채찍처럼
+  hsvx+=((hpx-hsx)*45-hsvx*3.5)*dt;hsx+=hsvx*dt;hsvz+=((hpz-hsz)*45-hsvz*3.5)*dt;hsz+=hsvz*dt;
   neck.rotation.set(hpx,Math.sin(spin+1)*.7*amp,hpz);
-  pr.rotation.y=Math.sin(T*.8)*.25;pr.position.y=kick*.05;
-  tailG.rotation.z=Math.sin(T*3)*.12+Math.sin(spin)*.3*amp;tailG.rotation.x=-hpx*.15;
-  arms[0].rotation.z=.2+Math.sin(T*4)*.1;arms[1].rotation.z=-2.7+Math.sin(T*8)*.25*amp;arms[1].rotation.x=kick*.4;
+  /* 드래그 따라 온몸으로 춤: 좌우 이동, 몸 비틀기, 기울기, 꼬리 흔들기, 팔 휘두르기 */
+  const k6=Math.min(1,dt*6);dxs+=(tdx-dxs)*k6;dys+=(tdy-dys)*k6;
+  pr.position.x=dxs*.5;pr.position.y=kick*.06+Math.abs(Math.sin(T*6))*.05*amp;
+  pr.rotation.y=Math.sin(T*.8)*.25*(1-amp)+dxs*.7+Math.sin(spin)*.3*amp;
+  pr.rotation.z=-dxs*.25+Math.cos(spin)*.1*amp;pr.rotation.x=dys*.12;
+  tailG.rotation.z=Math.sin(T*3)*.12+Math.sin(spin)*.5*amp+dxs*.35;tailG.rotation.x=-hpx*.15+Math.cos(spin)*.3*amp;
+  arms[0].rotation.z=.2+(-2.5)*amp+Math.sin(spin*2+T*8)*.4*amp;
+  arms[1].rotation.z=-.2+2.5*amp+Math.cos(spin*2+T*8)*.4*amp;
+  arms[0].rotation.x=kick*.4*amp;arms[1].rotation.x=kick*.4;
   ears.forEach((e,i)=>e.rotation.z=(i?-1:1)*(.15+hsvz*.06+Math.abs(hpz)*.3));tg.position.y=-.17-Math.max(0,hpx)*.05;
-  const lx=hpx-hsx,lz=hpz-hsz;
-  for(const s of strands)s.js.forEach((j,k)=>{j.rotation.x=.04-lx*.55+Math.sin(T*3+s.ph+k*.5)*.03;j.rotation.z=-lz*.55+Math.sin(T*2+s.ph)*.03});
-  tipMats.forEach((m,i)=>m.color.copy(col(T*.6+i*.12)).multiplyScalar(.8));
-  /* 이펙트 (밝기 낮춤) */
+  /* 이펙트 */
   hd.getWorldPosition(hw);
   if(amp>.25)emit(Math.floor(amp*5),hw,2);
   for(let i=rg.length-1;i>=0;i--){const m=rg[i];m.scale.addScalar(dt*m.userData.sp);m.material.opacity=Math.max(0,.7*(1-(m.scale.x-1)/8));m.material.color.copy(col(T*.5+i*.07));if(m.material.opacity<=0){scene.remove(m);m.material.dispose();rg.splice(i,1)}}
@@ -182,8 +231,9 @@ function loop(){
   sky.rotation.y=T*.06;sky.material.color.setScalar(.04+enS*.14+flash*.04);floorTex.rotation=T*.4;floor.material.emissiveIntensity=.1+enS*.35+kick*.1;
   pls.forEach((l,i)=>{l.color.copy(col(T*.4+i/3));l.intensity=.8+kick*1.2+enS*1.5;l.position.set(Math.sin(T*1.2+i*2.1)*3,1+i*.8,Math.cos(T*1.2+i*2.1)*2.5+1)});
   if(bloom)bloom.strength=.3+enS*.5+kick*.2+flash*.2;
-  const cz=cam.aspect<1?6.4:4.6;
-  cam.position.set(Math.sin(T*.3)*.8,1.4+Math.sin(T*.45)*.2,cz+Math.cos(T*.3)*.3);cam.fov=42;cam.updateProjectionMatrix();cam.lookAt(0,1.2,0);
+  const cz=cam.aspect<1?6.8:5;
+  cam.position.set(Math.sin(T*.3)*.8,1.4+Math.sin(T*.45)*.2,cz+Math.cos(T*.3)*.3);cam.fov=42;cam.updateProjectionMatrix();cam.lookAt(0,1.1,0);cam.updateMatrixWorld();
+  stepHair(dt,T);
   if(comp)comp.render();else R.render(scene,cam);
   if(run&&(tm>dur+.3))finish();
   drawHud(tm)}
@@ -191,7 +241,6 @@ function drawHud(tm){
   hx.setTransform(DPR,0,0,DPR,0,0);hx.clearRect(0,0,W,H);
   v3.copy(hw).project(cam);const cx=(v3.x*.5+.5)*W,cy=(-v3.y*.5+.5)*H,u=Math.min(W,H)/600;scX=cx;scY=cy;
   const n=performance.now();
-  /* 드래그 궤적: 무지개 */
   while(trail.length&&n-trail[0].t>500)trail.shift();
   hx.lineCap='round';
   for(let i=1;i<trail.length;i++){const a=trail[i-1],b=trail[i],f=1-(n-b.t)/500;hx.strokeStyle=`hsla(${(b.t/3)%360},100%,60%,${f*.8})`;hx.lineWidth=10*u*f+2;hx.beginPath();hx.moveTo(a.x,a.y);hx.lineTo(b.x,b.y);hx.stroke()}
